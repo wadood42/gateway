@@ -1,0 +1,268 @@
+
+schema
+  @link(url: "https://specs.apollo.dev/link/v1.0")
+  @link(url: "https://specs.apollo.dev/join/v0.2", for: EXECUTION)
+{
+  query: Query
+  mutation: Mutation
+}
+
+directive @join__field(graph: join__Graph!, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boolean! = false, resolvable: Boolean! = true) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+type Account
+  @join__type(graph: ACCOUNTS, key: "account_id")
+  @join__type(graph: POSTS, key: "account_id")
+{
+  account_id: String
+
+  """The email address for a given account"""
+  email: String @join__field(graph: ACCOUNTS)
+
+  """The passwrod for a given account """
+  password: String @join__field(graph: ACCOUNTS)
+
+  """The Date when account was created"""
+  created_at: String @join__field(graph: ACCOUNTS)
+  profile: Profile @join__field(graph: ACCOUNTS)
+
+  """contributing posts field to account entity"""
+  posts(offset: Int, limit: Int): [Post] @join__field(graph: POSTS)
+}
+
+type AccountResponse implements GetResponse
+  @join__implements(graph: ACCOUNTS, interface: "GetResponse")
+  @join__type(graph: ACCOUNTS)
+{
+  code: Int!
+  success: Boolean!
+  message: String!
+  account: Account
+}
+
+type Address
+  @join__type(graph: ACCOUNTS)
+{
+  country: String
+  state: String
+  city: String
+}
+
+type Comment
+  @join__type(graph: POSTS)
+{
+  id: String
+  body: String
+  createdAt: String
+  accountId: String
+  account: Account
+}
+
+type CreatePostResponse implements MutationResponse
+  @join__implements(graph: POSTS, interface: "MutationResponse")
+  @join__type(graph: POSTS)
+{
+  """Similar to HTTP status code, represents the status of the mutation"""
+  code: Int!
+
+  """Indicates whether the mutation was successful"""
+  success: Boolean!
+
+  """Human-readable message for the UI"""
+  message: String!
+  post: Post
+}
+
+interface GetResponse
+  @join__type(graph: ACCOUNTS)
+{
+  code: Int!
+  success: Boolean!
+  message: String!
+  account: Account
+}
+
+scalar join__FieldSet
+
+enum join__Graph {
+  ACCOUNTS @join__graph(name: "accounts", url: "http://localhost:3000/api/graphql")
+  POSTS @join__graph(name: "posts", url: "http://localhost:4001")
+}
+
+type Like
+  @join__type(graph: POSTS, key: "id")
+{
+  id: String
+  accountId: String
+  createdAt: String
+  account: Account
+}
+
+scalar link__Import
+
+enum link__Purpose {
+  """
+  `SECURITY` features provide metadata necessary to securely resolve fields.
+  """
+  SECURITY
+
+  """
+  `EXECUTION` features provide metadata necessary for operation execution.
+  """
+  EXECUTION
+}
+
+type Mutation
+  @join__type(graph: ACCOUNTS)
+  @join__type(graph: POSTS)
+{
+  """
+  This mutation takes email and password and responses with an account and token
+  """
+  signup(data: SignupParams!): SignupResponse! @join__field(graph: ACCOUNTS)
+  signin(data: SigninParams): SigninResponse! @join__field(graph: ACCOUNTS)
+  updateAccount(data: UpdateAccountParams!): UpdateAccountResponse! @join__field(graph: ACCOUNTS)
+  createPost(body: String!): CreatePostResponse! @join__field(graph: POSTS)
+
+  """adds a new comment to a given post and returns the new  comment"""
+  addComment(body: String!, postId: String!): Comment! @join__field(graph: POSTS)
+
+  """
+  creates a like for a given post and returns the account  of the person who likes the post
+  """
+  likePost(postId: String!): Post @join__field(graph: POSTS)
+  deletePost(postId: String!): Post! @join__field(graph: POSTS)
+}
+
+interface MutationResponse
+  @join__type(graph: ACCOUNTS)
+  @join__type(graph: POSTS)
+{
+  """Similar to HTTP status code, represents the status of the mutation"""
+  code: Int!
+
+  """Indicates whether the mutation was successful"""
+  success: Boolean!
+
+  """Human-readable message for the UI"""
+  message: String!
+}
+
+type Post
+  @join__type(graph: POSTS, key: "id")
+{
+  id: String
+  body: String
+  accountId: String
+  createdAt: String
+  updatedAt: String
+  account: Account
+  comments: [Comment]
+  likes: [Like]
+}
+
+type Profile
+  @join__type(graph: ACCOUNTS)
+{
+  profile_id: ID
+  first_name: String
+  last_name: String
+  age: Int
+  gender: String
+  job: String
+  description: String
+  profile_image_url: String
+  account_id: ID
+  created_at: String
+  address: Address
+}
+
+type Query
+  @join__type(graph: ACCOUNTS)
+  @join__type(graph: POSTS)
+{
+  account(account_id: String!): AccountResponse! @join__field(graph: ACCOUNTS)
+  post(id: String!): Post! @join__field(graph: POSTS)
+}
+
+input SigninParams
+  @join__type(graph: ACCOUNTS)
+{
+  email: String!
+  password: String!
+}
+
+type SigninResponse
+  @join__type(graph: ACCOUNTS)
+{
+  code: Int!
+  success: Boolean!
+  message: String!
+  token: String
+  account: Account
+}
+
+input SignupParams
+  @join__type(graph: ACCOUNTS)
+{
+  """The email address for signing up"""
+  email: String
+
+  """The password for an account"""
+  password: String
+}
+
+type SignupResponse implements MutationResponse
+  @join__implements(graph: ACCOUNTS, interface: "MutationResponse")
+  @join__type(graph: ACCOUNTS)
+{
+  """Code is a string represents the status for the operation"""
+  code: Int!
+
+  """
+  The success is a boolean, represents whether a given operation was a success or not
+  """
+  success: Boolean!
+
+  """a short message describing what happened"""
+  message: String!
+
+  """The JWT token, after a successful signup"""
+  token: String
+
+  """The signup account"""
+  account: Account
+}
+
+"""represents the data to update the account"""
+input UpdateAccountParams
+  @join__type(graph: ACCOUNTS)
+{
+  first_name: String
+  last_name: String
+  age: Int
+  gender: String
+  job: String
+  description: String
+  profile_image_url: String
+  country: String
+  state: String
+  city: String
+}
+
+type UpdateAccountResponse implements MutationResponse
+  @join__implements(graph: ACCOUNTS, interface: "MutationResponse")
+  @join__type(graph: ACCOUNTS)
+{
+  code: Int!
+  success: Boolean!
+  message: String!
+  profile: Profile
+}
